@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--+
+    | This script will allow you to build a WCC/UCM/Stellent Content Server Component in your IDE
+    | using ANT!  This simple script compiles and then assembles your component.  Use the 
+    | 'additional paths' to add resources, files, etc that may not be in the standard directories
+    | created by ComponentWizard.  Make special note of the compiler configuration and classpath
+    | entries required to allow this script to execute.  Another note is to realize some Eclipse
+    | specific targets are used, so please review before use.  Thanks!  Aaron Romine
+    +-->
+<project default="dist" basedir=".">
+	<basename property="project.name" file="${basedir}" />
+
+	<!--+
+ 	    | Please adjust the following properties to match your project specifics
+   	    +-->
+	<!-- use this to specify folders other than the standard classes, templates, resources, lib in the component.  Example: src/**,*.gif-->
+	<property name="additional.paths" value="" />
+	
+	<!-- Location where the built classes live.  Traditionally WCC Component use the 'classes' directory -->
+	<property name="build.home" value="${basedir}/classes" />
+	
+	<!-- Location of source code to compile, default to the 'src' suggestion from Ecipse -->
+	<property name="src.home" value="${basedir}/src" />
+	
+	<!-- output directory for component builds, this can be anywhere, but it's where the .zip gets saved -->
+	<property name="component.outputdir" value="${basedir}/built_component" />
+
+	<!-- change only if you want to compile without debug -->
+	<property name="compile.debug" value="true" />
+	<property name="compile.deprecation" value="true" />
+	<property name="component.root" value="component/${project.name}/" />
+	
+	<!--+ 
+	    | You can use the JDT Compile adapter to get past not having a local JDK, just add a reference
+	    | to the jdtCompilerAdapter.jar to the ant runtime in Window->Preferences->Ant->Runtime
+	    +-->
+	<property name="build.compiler" value="org.eclipse.jdt.core.JDTCompilerAdapter" />
+
+  <!--+ 
+      | During the ant build process, you'll probably need to introduce the ${project_classpath} to the ant 
+      | build config to reference the idcserver.jar to allow the compile step to work.
+      +-->
+	<path id="compile.classpath"/>
+	
+	<target name="clean">
+	  <!--+ 
+	      | Be careful!  Use this first option if your .java src is in the same dir as your 
+	      | classes which is common with many Stellent era components.  Otherwise use a separate
+	      | 'src' folder, it's just cleaner!
+	      +-->
+		<!--delete dir="${build.home}/**/*.class" /-->
+		<delete dir="${build.home}" />
+		<delete dir="${component.outputdir}"/>
+		<mkdir dir="${build.home}" />
+		<mkdir dir="${component.outputdir}" />
+	</target>
+
+	<target name="compile" depends="clean">
+		<javac source="1.6" target="1.6" srcdir="${src.home}" destdir="${build.home}" debug="${compile.debug}" deprecation="${compile.deprecation}" includeantruntime="true">
+			<classpath refid="compile.classpath" />
+		</javac>
+	</target>
+
+	<target name="dist" depends="compile" description="Package as a Fusion ECM Component">
+		<!-- This will create a build number that gets auto incremented each time for the component. -->
+		<buildnumber />
+		<tstamp>
+			<format property="component.timestamp" pattern="yyyy_MM_dd" />
+			<format property="component.manifesttime" pattern="M/d/yy h:mm a" />
+		</tstamp>
+		<echo message="Updating ${project.name}.hda with new version string: ${component.timestamp}(build ${build.number})"/>
+		
+		<!-- Update the Component.hda file, as well as the manifest.hda file with the component's create date and build number -->
+		<replaceregexp file="${project.name}.hda" match="^(version=).*" replace="\1${component.timestamp}(build ${build.number})" byline="true" />
+		<replaceregexp file="manifest.hda" match="^(CreateDate=).*" replace="\1${component.manifesttime}" byline="true" />
+		<echo message="Building ${project.name} component." />
+		
+		<!-- Build the actual deployment, this will have the proper component structure -->
+		<zip destfile="${component.outputdir}/${project.name}-${component.timestamp} (build ${build.number}).zip">
+			<zipfileset dir="${basedir}" includes="*.hda,*.htm,*.cfg,*.jar,*.txt,classes/**,idcautopublish/**,resources/**,templates/**,lib/**,${additional.paths}" excludes="manifest.hda,**/lockwait.dat" prefix="${component.root}" casesensitive="false" />
+			<zipfileset dir="${basedir}" includes="manifest.hda" fullpath="manifest.hda" casesensitive="false" />
+		</zip>
+		
+		<!--+ 
+		    | Comment out if you don't use eclipse!  This refreshs the eclipse project to prevent 'sync' issues
+		    | as we are modifying the hda source and creating a .zip in the 'built_component' dir.
+		    +-->
+		<eclipse.refreshLocal resource="${project.name}" depth="infinite"/>
+	</target>
+</project>
